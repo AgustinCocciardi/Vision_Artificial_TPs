@@ -2,13 +2,14 @@ import cv2
 import numpy as np
 import os
 
-def nothing(x): 
+def nothing(x):
     pass
 
+# Ventana de ajustes
 cv2.namedWindow("Ajustes")
 cv2.createTrackbar("Umbral", "Ajustes", 127, 255, nothing)
 cv2.createTrackbar("Kernel", "Ajustes", 1, 20, nothing)
-cv2.createTrackbar("Match Thresh", "Ajustes", 20, 100, nothing)
+cv2.createTrackbar("Match Thresh", "Ajustes", 20, 100, nothing)  # umbral global para todas las figuras
 
 # ------------------------------------------------------------------
 # Cargar imágenes de referencia
@@ -29,41 +30,52 @@ def load_reference_shape(filename):
     return contours[0]
 
 ref_shapes = {
-    "Triángulo": load_reference_shape("triangulo.JPG"),
+    "Triangulo": load_reference_shape("triangulo.JPG"),
     "Cuadrado": load_reference_shape("cuadrado.JPG"),
     "Estrella": load_reference_shape("estrella.JPG")
 }
 
 # ------------------------------------------------------------------
-# Clasificar contorno con vértices + matchShapes
+# Clasificación con vértices + matchShapes + convexidad
 # ------------------------------------------------------------------
 def classify_shape(cnt, refs, match_thresh):
     epsilon = 0.02 * cv2.arcLength(cnt, True)
     approx = cv2.approxPolyDP(cnt, epsilon, True)
     n_vertices = len(approx)
-    
-    candidates = {}
-    for name, ref in refs.items():
-        # Número de vértices aproximado para cada forma
-        if name == "Triángulo" and n_vertices != 3:
-            continue
-        if name == "Cuadrado" and n_vertices != 4:
-            continue
-        if name == "Estrella" and n_vertices < 8:  # estrellas suelen tener 10 vértices
-            continue
+    area = cv2.contourArea(cnt)
+    solidity = float(area) / cv2.contourArea(cv2.convexHull(cnt))
 
-        score = cv2.matchShapes(cnt, ref, cv2.CONTOURS_MATCH_I1, 0.0)
-        candidates[name] = score
-    
+    candidates = {}
+
+    # Triángulo
+    if n_vertices == 3:
+        score = cv2.matchShapes(cnt, refs["Triangulo"], cv2.CONTOURS_MATCH_I1, 0.0)
+        candidates["Triangulo"] = score
+
+    # Cuadrado
+    elif n_vertices == 4:
+        x, y, w, h = cv2.boundingRect(cnt)
+        aspect_ratio = float(w)/h
+        if 0.9 <= aspect_ratio <= 1.1:  # solo cuadrados
+            score = cv2.matchShapes(cnt, refs["Cuadrado"], cv2.CONTOURS_MATCH_I1, 0.0)
+            candidates["Cuadrado"] = score
+
+    # Estrella
+    elif n_vertices >= 8:
+        if solidity < 0.9:  # evitar círculos/figuras convexas
+            score = cv2.matchShapes(cnt, refs["Estrella"], cv2.CONTOURS_MATCH_I1, 0.0)
+            candidates["Estrella"] = score
+
     if not candidates:
         return "Desconocido"
 
-    # Mejor coincidencia
     best_shape = min(candidates, key=candidates.get)
     if candidates[best_shape] > match_thresh:
         return "Desconocido"
     return best_shape
 
+# ------------------------------------------------------------------
+# Captura de webcam
 # ------------------------------------------------------------------
 cap = cv2.VideoCapture(0)
 
