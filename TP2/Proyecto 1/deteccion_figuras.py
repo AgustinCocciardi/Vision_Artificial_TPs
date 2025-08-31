@@ -9,7 +9,8 @@ def nothing(x):
 cv2.namedWindow("Ajustes")
 cv2.createTrackbar("Umbral", "Ajustes", 127, 255, nothing)
 cv2.createTrackbar("Kernel", "Ajustes", 1, 20, nothing)
-cv2.createTrackbar("Match Thresh", "Ajustes", 20, 100, nothing)  # umbral global para todas las figuras
+cv2.createTrackbar("Match Thresh", "Ajustes", 20, 100, nothing)
+cv2.createTrackbar("Area Min", "Ajustes", 500, 5000, nothing)  # nuevo trackbar para área mínima
 
 # ------------------------------------------------------------------
 # Cargar imágenes de referencia
@@ -56,13 +57,13 @@ def classify_shape(cnt, refs, match_thresh):
     elif n_vertices == 4:
         x, y, w, h = cv2.boundingRect(cnt)
         aspect_ratio = float(w)/h
-        if 0.9 <= aspect_ratio <= 1.1:  # solo cuadrados
+        if 0.9 <= aspect_ratio <= 1.1:
             score = cv2.matchShapes(cnt, refs["Cuadrado"], cv2.CONTOURS_MATCH_I1, 0.0)
             candidates["Cuadrado"] = score
 
     # Estrella
     elif n_vertices >= 8:
-        if solidity < 0.9:  # evitar círculos/figuras convexas
+        if solidity < 0.9:
             score = cv2.matchShapes(cnt, refs["Estrella"], cv2.CONTOURS_MATCH_I1, 0.0)
             candidates["Estrella"] = score
 
@@ -88,6 +89,7 @@ while True:
     thresh_val = cv2.getTrackbarPos("Umbral", "Ajustes")
     kernel_size = cv2.getTrackbarPos("Kernel", "Ajustes")
     match_thresh = cv2.getTrackbarPos("Match Thresh", "Ajustes") / 100.0
+    area_min = cv2.getTrackbarPos("Area Min", "Ajustes")  # nueva variable
 
     _, thresh = cv2.threshold(gray, thresh_val, 255, cv2.THRESH_BINARY_INV)
     kernel = np.ones((kernel_size, kernel_size), np.uint8)
@@ -96,7 +98,7 @@ while True:
     contours, _ = cv2.findContours(morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     for cnt in contours:
-        if cv2.contourArea(cnt) < 500:
+        if cv2.contourArea(cnt) < area_min:  # usamos trackbar
             continue
 
         shape_name = classify_shape(cnt, ref_shapes, match_thresh)
