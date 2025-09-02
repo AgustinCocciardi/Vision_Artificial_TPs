@@ -1,9 +1,16 @@
+import os
 import cv2
 import numpy as np
 import joblib
 
-# Cargar modelo entrenado
-modelo = joblib.load("modelo_figuras.pkl")
+# Carpeta donde está tu script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Ruta absoluta al modelo
+modelo_path = os.path.join(script_dir, "modelo_figuras.pkl")
+
+# Cargar modelo
+modelo = joblib.load(modelo_path)
 
 # Diccionario de etiquetas
 etiquetas = {1: "Cuadrado", 2: "Triángulo", 3: "Estrella"}
@@ -33,7 +40,7 @@ while True:
             hu = cv2.HuMoments(momentos).flatten()
 
             # Transformación logarítmica para estabilidad
-            hu = -np.sign(hu) * np.log10(np.abs(hu))
+            hu = -np.sign(hu) * np.log10(np.abs(hu) + 1e-10)
 
             # Predicción con el modelo
             pred = modelo.predict([hu])[0]
