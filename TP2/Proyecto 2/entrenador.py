@@ -1,24 +1,43 @@
-import os
 import pandas as pd
 from sklearn.tree import DecisionTreeClassifier
 import joblib
+import os
 
-# Cargar dataset (ajustá la ruta a tu archivo CSV o Excel)
-# Ejemplo: dataset.csv con columnas hu1...hu7 y etiqueta
-script_dir = os.path.dirname(os.path.abspath(__file__))
-file_path = os.path.join(script_dir, "dataset.csv")
+# Nombre del archivo CSV con tu dataset
+DATASET_FILE = "dataset.csv"
 
-df = pd.read_csv(file_path)
+# Nombre del modelo entrenado
+MODEL_FILE = "modelo_figuras.pkl"
 
-# Definir variables independientes (X) y dependiente (y)
-X = df[['hu1', 'hu2', 'hu3', 'hu4', 'hu5', 'hu6', 'hu7']]
-y = df['etiqueta']
+def main():
+    # Obtener ruta absoluta del script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    dataset_path = os.path.join(script_dir, DATASET_FILE)
 
-# Crear y entrenar el modelo
-modelo = DecisionTreeClassifier(random_state=42)
-modelo.fit(X, y)
+    # Cargar dataset
+    df = pd.read_csv(dataset_path)
 
-# Guardar el modelo en un archivo
-joblib.dump(modelo, "modelo_figuras.pkl")
+    # Features (invariantes de Hu)
+    X = df[["hu1", "hu2", "hu3", "hu4", "hu5", "hu6", "hu7"]]
 
-print("✅ Modelo entrenado y guardado en 'modelo_figuras.pkl'")
+    # Etiquetas
+    y = df["etiqueta"]
+
+    # Crear modelo Decision Tree
+    clf = DecisionTreeClassifier(
+        criterion="gini",   # o "entropy"
+        max_depth=None,     # podés ajustar para evitar overfitting
+        random_state=42
+    )
+
+    # Entrenar
+    clf.fit(X, y)
+
+    # Guardar el modelo en la misma ruta del script
+    ruta_guardado = os.path.join(script_dir, MODEL_FILE)
+    joblib.dump(clf, ruta_guardado)
+
+    print(f"✅ Modelo entrenado y guardado en: {ruta_guardado}")
+
+if __name__ == "__main__":
+    main()
