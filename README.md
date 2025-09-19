@@ -13,5 +13,6 @@ Enlace al proyecto 2: https://docs.google.com/document/d/1d-8tQj0l6WiwDZ7O_BJRho
  
 Estos dos proyectos conforman el segundo trabajo práctico.
 
-TP3:
+TP3 [Se entrega el 2/10]:
 
+https://docs.google.com/document/d/1zjkWDcWrFWA0KoarE6ce7cHkNLmE5J3_YaVyUZ6d-wY/edit?tab=t.0
