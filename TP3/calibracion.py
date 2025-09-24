@@ -3,7 +3,7 @@ import numpy as np
 import glob
 
 # Tamaño del patrón de ajedrez (número de esquinas internas por fila y columna)
-chessboard_size = (7, 7)  # 9 esquinas horizontales, 6 verticales
+chessboard_size = (7,7)  # 9 esquinas horizontales, 6 verticales
 square_size = 25  # tamaño del cuadrado en milímetros (puede ser cualquier unidad)
 
 # Preparar puntos 3D en el espacio real (0,0,0), (1,0,0), (2,0,0)...
