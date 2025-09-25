@@ -1,10 +1,12 @@
 import cv2
 import numpy as np
+import os
  
 # ======================
 # 1. Cargar calibración
 # ======================
-data = np.load("calibration_data.npz")
+ruta = os.path.join(os.path.dirname(__file__), "calibration_data.npz")
+data = np.load(ruta)
 mtx = data["mtx"]
 dist = data["dist"]
  
