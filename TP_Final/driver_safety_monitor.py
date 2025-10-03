@@ -199,15 +199,15 @@ class PhoneHeuristic:
 @dataclass
 class FusionWeights:
     somnolencia: float = 0.5
-    cinturón: float = 0.25  # penaliza ausencia: usa (100 - score_cinturon)
+    cinturon: float = 0.25  # penaliza ausencia: usa (100 - score_cinturon)
     celular: float = 0.25
 
 
 def fuse_scores(score_somn, score_belt, score_phone, w: FusionWeights):
     return (
-        w.somnolencia * score_somn
-        + w.cinturón * (100.0 - score_belt)
-        + w.celular * score_phone
+            w.somnolencia * score_somn
+            + w.cinturon * (100.0 - score_belt)
+            + w.celular * score_phone
     )
 
 
