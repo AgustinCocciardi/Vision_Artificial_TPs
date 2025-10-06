@@ -1,8 +1,8 @@
-path: ./dataset_yolo  # carpeta raíz del dataset nuevo
+path: C:/Users/Agustin Cocciardi/Documents/GitHub/Vision_Artificial_TPs/TP4/dataset_yolo
 
-train: train/images
-val: val/images
-test: test/images
+train: train
+val: val
+test: test
 
 names:
   0: bacon
