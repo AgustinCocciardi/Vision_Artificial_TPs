@@ -47,56 +47,66 @@ fig, ax = plt.subplots(figsize=(8, 6))
 
 
 def mostrar_imagen(index):
-    """Muestra la imagen con detecciones y texto lateral."""
+    """Muestra la imagen con bounding boxes y datos fuera de la imagen."""
     ax.clear()
     filename = image_files[index]
     image_path = os.path.join(TEST_IMAGES_DIR, filename)
 
+    # Inferencia
     results = model(image_path)
     image = cv2.imread(image_path)
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    # --- Filtrar detecciones ---
-    detecciones = {}
+    detecciones = []
+    conteo_detecciones = {}
+
     for result in results:
         for box in result.boxes:
             conf = float(box.conf[0])
             cls = int(box.cls[0])
-            label = result.names[cls]
+            label = result.names[cls].lower()
+            x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
 
-            # Mantener solo la detección más confiable por clase
-            if label not in detecciones or conf > detecciones[label]["conf"]:
-                detecciones[label] = {
-                    "conf": conf,
-                    "xyxy": box.xyxy[0].cpu().numpy()
-                }
+            # Guardar todas las detecciones
+            detecciones.append({
+                "label": label,
+                "conf": conf,
+                "xyxy": (x1, y1, x2, y2)
+            })
 
-    # --- Dibujar resultados ---
-    calorias_totales = 0
-    for label, data in detecciones.items():
-        x1, y1, x2, y2 = map(int, data["xyxy"])
-        conf = data["conf"]
+            # Contar por clase
+            conteo_detecciones[label] = conteo_detecciones.get(label, 0) + 1
 
-        # Dibujar rectángulo
+    # --- Dibujar bounding boxes ---
+    for det in detecciones:
+        x1, y1, x2, y2 = det["xyxy"]
         cv2.rectangle(image_rgb, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        texto = f"{label} ({conf:.2f})"
-        cv2.putText(image_rgb, texto, (x1, y1 - 5),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-        calorias = calorias_por_alimento.get(label.lower(), 0)
-        calorias_totales += calorias
+    # --- Calcular calorías totales ---
+    calorias_totales = 0
+    lineas_info = []
 
-    # --- Mostrar resultado ---
+    for det in detecciones:
+        label = det["label"]
+        conf = det["conf"]
+        calorias_unitarias = calorias_por_alimento.get(label, 0)
+        lineas_info.append(f"{label}: conf={conf:.2f}, {calorias_unitarias} kcal/unidad")
+
+    # Agrupado por clase
+    for label, cantidad in conteo_detecciones.items():
+        calorias_label = calorias_por_alimento.get(label, 0) * cantidad
+        calorias_totales += calorias_label
+        lineas_info.append(f"→ {label}: {cantidad} × {calorias_por_alimento.get(label, 0)} = {calorias_label} kcal")
+
+    lineas_info.append(f"\nTOTAL ESTIMADO: {calorias_totales} kcal")
+
+    # --- Mostrar imagen y texto ---
     ax.imshow(image_rgb)
     ax.axis("off")
 
-    etiquetas = [f"{label}: {calorias_por_alimento.get(label.lower(), 0)} kcal"
-                 for label in detecciones.keys()]
-    texto = "\n".join(etiquetas)
-    texto += f"\n\nTotal estimado: {calorias_totales} kcal"
-
+    texto = "\n".join(lineas_info)
     plt.text(1.05, 0.5, texto, transform=ax.transAxes,
-             fontsize=12, va='center', bbox=dict(facecolor='white', alpha=0.8))
+             fontsize=11, va='center', bbox=dict(facecolor='white', alpha=0.9))
     plt.title(f"{filename}  ({index+1}/{len(image_files)})")
     plt.tight_layout()
     fig.canvas.draw_idle()

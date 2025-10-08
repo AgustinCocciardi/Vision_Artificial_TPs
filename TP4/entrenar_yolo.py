@@ -1,23 +1,30 @@
 import os
 from ultralytics import YOLO
 
-# Ruta absoluta al script
+# --- Rutas absolutas ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_YAML = os.path.join(SCRIPT_DIR, 'data.yaml')
 
-# Cargar modelo preentrenado (puede ser 'yolov8s.pt', 'yolov8n.pt', etc.)
-modelo = YOLO('yolov8s.pt')
+# --- Cargar modelo base (preentrenado y liviano) ---
+model = YOLO('yolov8s.pt')  # 'n' = nano (más rápido en CPU)
 
-# Entrenar
-modelo.train(
-    data=DATA_YAML,     # path al archivo YAML
-    epochs=4,            # podés subir o bajar
-    imgsz=320,            # tamaño de imagen
-    batch=4,             # ajustar según tu GPU/CPU
+# --- Entrenamiento ---
+model.train(
+    data=DATA_YAML,       # ruta al archivo YAML
+    epochs=50,            # 50 es buen punto de partida en CPU
+    imgsz=512,            # tamaño más liviano
+    batch=2,              # ideal para CPU
     workers=0,            # evita errores en Windows
-    device='cpu',          # 'cpu' si no está disponible el GPU,
-    freeze=10        # congela las primeras 10 capas
+    device='cpu',         # fuerza CPU
+    name='fruits_cpu',    # nombre del experimento
+    project='runs/train', # carpeta donde se guardan los resultados
+    freeze=10,            # congela primeras capas (transfer learning)
+    patience=10,          # early stopping
+    augment=True          # aumenta diversidad del dataset
 )
 
-# Opcional: evaluación
-modelo.val()
+# --- Evaluación final ---
+model.val(data=DATA_YAML)
+
+print("\n✅ Entrenamiento completado (modo CPU).")
+print("Revisa la carpeta 'runs/train/fruits_cpu' para ver los resultados.")
