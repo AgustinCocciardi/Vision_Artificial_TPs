@@ -1,27 +1,15 @@
-path: C:/Users/Agustin Cocciardi/Documents/GitHub/Vision_Artificial_TPs/TP4/dataset_yolo
+train: C:/Users/Agustin Cocciardi/Documents/GitHub/Vision_Artificial_TPs/TP4/dataset_yolo/train
+val: C:/Users/Agustin Cocciardi/Documents/GitHub/Vision_Artificial_TPs/TP4/dataset_yolo/test
 
-train: train
-val: val
-test: test
-
+nc: 10
 names:
-  0: bacon
-  1: banana
-  2: bread
-  3: broccoli
-  4: butter
-  5: carrots
-  6: cheese
-  7: chicken
-  8: cucumber
-  9: eggs
-  10: fish
-  11: lettuce
-  12: milk
-  13: onions
-  14: peppers
-  15: potatoes
-  16: sausages
-  17: spinach
-  18: tomato
-  19: yogurt
+  - Banana
+  - Jackfruit
+  - Mango
+  - Litchi
+  - Hog Plum
+  - Papaya
+  - Grapes
+  - Apple
+  - Orange
+  - Guava
