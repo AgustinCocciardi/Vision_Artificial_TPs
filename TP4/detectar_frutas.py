@@ -12,8 +12,8 @@ TEST_IMAGES_DIR = os.path.join(CURRENT_DIR, "test_images")
 # --- Umbrales ---
 #UMBRAL_CONF = 0.6      # Confianza mínima
 #UMBRAL_IOA = 1       # Porcentaje de solapamiento para descartar box pequeño
-UMBRAL_CONF = 0.65      # Confianza mínima
-UMBRAL_IOA = 0.97       # Porcentaje de solapamiento para descartar box pequeño
+UMBRAL_CONF = 0.01      # Confianza mínima
+UMBRAL_IOA = 0.95       # Porcentaje de solapamiento para descartar box pequeño
 
 # --- Clases del dataset ---
 CLASES = [
