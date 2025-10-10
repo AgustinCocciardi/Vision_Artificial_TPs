@@ -84,7 +84,7 @@ model = YOLO(MODEL_PATH)
 cap = cv2.VideoCapture(0)  # Cámara 0 confirmada
 
 if not cap.isOpened():
-    print("❌ No se pudo acceder a la cámara.")
+    print(" No se pudo acceder a la cámara.")
     exit()
 
 while True:
