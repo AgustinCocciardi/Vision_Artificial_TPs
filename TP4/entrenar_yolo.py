@@ -26,5 +26,5 @@ model.train(
 # --- Evaluación final ---
 model.val(data=DATA_YAML)
 
-print("\n✅ Entrenamiento completado (modo CPU).")
+print("\nEntrenamiento completado (modo CPU).")
 print("Revisa la carpeta 'runs/train/fruits_cpu' para ver los resultados.")
