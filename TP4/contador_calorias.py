@@ -1,0 +1,172 @@
+import os
+from ultralytics import YOLO
+import cv2
+import matplotlib.pyplot as plt
+import random
+
+# --- Configuración de rutas ---
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(CURRENT_DIR, "best.pt")
+TEST_IMAGES_DIR = os.path.join(CURRENT_DIR, "test_images")
+
+# --- Umbrales ---
+#UMBRAL_CONF = 0.6      # Confianza mínima
+#UMBRAL_IOA = 1       # Porcentaje de solapamiento para descartar box pequeño
+UMBRAL_CONF = 0.35
+UMBRAL_IOA = 0.8
+
+# --- Clases del dataset ---
+CLASES = [
+    "Banana", "Jackfruit", "Mango", "Litchi", "Hog Plum",
+    "Papaya", "Grapes", "Apple", "Orange", "Guava"
+]
+
+# --- Calorías estimadas por unidad ---
+CALORIAS_POR_FRUTA = {
+    "Banana": 89, "Jackfruit": 155, "Mango": 60, "Litchi": 66, "Hog Plum": 75,
+    "Papaya": 43, "Grapes": 69, "Apple": 52, "Orange": 47, "Guava": 68
+}
+
+# --- Colores únicos por clase ---
+COLORS = {
+    cls: tuple([int(x) for x in (
+        random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
+    )]) for cls in CLASES
+}
+
+def get_color_for_label(label):
+    for variant in [label, label.capitalize(), label.lower()]:
+        if variant in COLORS:
+            return COLORS[variant]
+    h = abs(hash(label)) % (256**3)
+    return ((h >> 16) & 255, (h >> 8) & 255, h & 255)
+
+# --- NUEVA FUNCIÓN: color por DETECCIÓN (determinístico por label+coords) ---
+def get_color_for_det(det):
+    s = f"{det['label']}_{det['xyxy'][0]}_{det['xyxy'][1]}_{det['xyxy'][2]}_{det['xyxy'][3]}"
+    h = abs(hash(s)) % (256**3)
+    r = (h >> 16) & 255
+    g = (h >> 8) & 255
+    b = h & 255
+    return (r, g, b)
+
+# --- Cargar modelo YOLO ---
+model = YOLO(MODEL_PATH)
+
+# --- Obtener imágenes ---
+image_files = sorted([
+    f for f in os.listdir(TEST_IMAGES_DIR)
+    if f.lower().endswith(('.jpg', '.jpeg', '.png'))
+])
+
+current_index = 0
+fig, ax = plt.subplots(figsize=(10, 7))
+
+# --- Utilidades ---
+def box_area(box):
+    x1, y1, x2, y2 = box
+    return max(0, x2 - x1) * max(0, y2 - y1)
+
+def ioa(boxA, boxB):
+    x1 = max(boxA[0], boxB[0])
+    y1 = max(boxA[1], boxB[1])
+    x2 = min(boxA[2], boxB[2])
+    y2 = min(boxA[3], boxB[3])
+    inter = max(0, x2 - x1) * max(0, y2 - y1)
+    return inter / box_area(boxA) if box_area(boxA) > 0 else 0.0
+
+def filtrar_boxes(dets):
+    n = len(dets)
+    keep = [True] * n
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                continue
+            A, B = dets[i], dets[j]
+            if A['label'].lower() != B['label'].lower():
+                continue
+            boxA, boxB = A['xyxy'], B['xyxy']
+            if box_area(boxA) < box_area(boxB) and ioa(boxA, boxB) >= UMBRAL_IOA:
+                if A['conf'] < B['conf']:
+                    keep[i] = False
+    return [d for k, d in enumerate(dets) if keep[k]]
+
+# --- Mostrar imagen ---
+def mostrar_imagen(index):
+    ax.clear()
+    filename = image_files[index]
+    path = os.path.join(TEST_IMAGES_DIR, filename)
+
+    results = model(path)
+    img = cv2.imread(path)
+
+    dets = []
+
+    for result in results:
+        for box in result.boxes:
+            conf = float(box.conf[0])
+            if conf < UMBRAL_CONF:
+                continue
+            cls = int(box.cls[0])
+            label = result.names[cls]
+            x1, y1, x2, y2 = map(int, box.xyxy[0].cpu().numpy())
+            dets.append({"label": label, "conf": conf, "xyxy": (x1, y1, x2, y2)})
+
+    kept = filtrar_boxes(dets)
+
+    for det in kept:
+        x1, y1, x2, y2 = det["xyxy"]
+        color_rgb = get_color_for_det(det)
+        color_bgr = (int(color_rgb[2]), int(color_rgb[1]), int(color_rgb[0]))
+        cv2.rectangle(img, (x1, y1), (x2, y2), color_bgr, 2)
+
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    ax.imshow(img_rgb)
+    ax.axis("off")
+
+    calorias_totales = 0
+
+    for i, det in enumerate(kept):
+        label = det['label']
+        calorias = CALORIAS_POR_FRUTA.get(label, 0)
+        calorias_totales += calorias
+
+        color_rgb = get_color_for_det(det)
+        color_norm = (color_rgb[0]/255.0, color_rgb[1]/255.0, color_rgb[2]/255.0)
+
+        ax.text(
+            1.05, 0.9 - i * 0.05,
+            f"{label} ({det['conf']*100:.1f}%) - {calorias} kcal",
+            transform=ax.transAxes,
+            fontsize=10,
+            color=color_norm,
+            va='top'
+        )
+
+    ax.text(
+        1.05, 0.9 - len(kept) * 0.05 - 0.1,
+        f"TOTAL: {calorias_totales} kcal",
+        transform=ax.transAxes,
+        fontsize=12,
+        color='blue',
+        fontweight='bold',
+        va='top'
+    )
+
+    plt.title(f"{filename} ({index+1}/{len(image_files)})")
+    plt.tight_layout()
+    fig.canvas.draw_idle()
+
+# --- Navegación ---
+def on_key(event):
+    global current_index
+    if event.key == "right":
+        current_index = (current_index + 1) % len(image_files)
+        mostrar_imagen(current_index)
+    elif event.key == "left":
+        current_index = (current_index - 1) % len(image_files)
+        mostrar_imagen(current_index)
+
+fig.canvas.mpl_connect("key_press_event", on_key)
+mostrar_imagen(current_index)
+plt.show()
