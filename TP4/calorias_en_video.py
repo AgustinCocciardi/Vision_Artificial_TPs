@@ -8,7 +8,7 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(CURRENT_DIR, "best.pt")
 
 # --- Umbrales ---
-UMBRAL_CONF = 0.35
+UMBRAL_CONF = 0.8
 UMBRAL_IOA = 0.9
 
 # --- Clases del dataset ---
