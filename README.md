@@ -17,5 +17,6 @@ TP3 [APROBADO]:
 
 https://docs.google.com/document/d/1zjkWDcWrFWA0KoarE6ce7cHkNLmE5J3_YaVyUZ6d-wY/edit?tab=t.0
 
-TP4 [Se entrega el 16/10]
+TP4 [APROBADO]:
+
 Usar yolo 8. Transfer learning. Reentrenar un dataset elegido para que detecte cosas de otro dataset diferente.
