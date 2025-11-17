@@ -35,6 +35,57 @@ yolo_belt  = YOLO(CINTURON_MODEL_PATH)
 
 
 # =======================================================
+# 0.1. LÓGICA DEL CINTURÓN (60s grace + 5s ausencia)
+# =======================================================
+
+GRACE_AFTER_DETECT = 20
+
+class BeltMonitor:
+    def __init__(self, grace_after_detect=GRACE_AFTER_DETECT, require_missing_duration=5.0):
+        self.grace_after_detect = grace_after_detect        # después de verlo
+        self.require_missing_duration = require_missing_duration  # 5s sin verlo → alerta
+
+        self.last_belt_ok_time = None
+        self.first_missing_time = None
+
+    def update(self, belt_detected: bool, ts: float):
+        """
+        Devuelve:
+            0   -> cinturón OK
+            100 -> alerta (ausente 5s tras 1 minuto sin detectarlo)
+        """
+
+        # Caso 1: detectado → OK + reiniciar timers
+        if belt_detected:
+            self.last_belt_ok_time = ts
+            self.first_missing_time = None
+            return 0
+
+        # Caso 2: nunca detectado → chequear 5 segundos
+        if self.last_belt_ok_time is None:
+            return self._handle_missing(ts)
+
+        # Caso 3: dentro de ventana de gracia
+        if (ts - self.last_belt_ok_time) < self.grace_after_detect:
+            self.first_missing_time = None
+            return 0
+
+        # Caso 4: pasó el minuto → aplicar regla de 5 segundos
+        return self._handle_missing(ts)
+
+    def _handle_missing(self, ts: float):
+        """Lógica de 5 segundos para disparar alerta."""
+        if self.first_missing_time is None:
+            self.first_missing_time = ts
+            return 0
+
+        if (ts - self.first_missing_time) >= self.require_missing_duration:
+            return 100
+
+        return 0
+
+
+# =======================================================
 # 1. MEDIA PIPE HELPERS
 # =======================================================
 
@@ -122,15 +173,15 @@ def detect_belt_yolo(frame, min_conf=0.5):
     """
     Devuelve:
     0.0  si encuentra cinturón
-    100 si no encuentra
+    100 si no lo encuentra
     """
     res = yolo_belt(frame, verbose=False)[0]
 
     for b in res.boxes:
         if float(b.conf[0]) >= min_conf:
-            return 0.0  # cinturón detectado
+            return 0.0
 
-    return 100.0  # no detectado → riesgo
+    return 100.0
 
 
 # =======================================================
@@ -139,10 +190,7 @@ def detect_belt_yolo(frame, min_conf=0.5):
 
 def detect_phone_yolo(frame, min_conf=0.5):
     """
-    Tu modelo tiene cls=1 → celular
-    Devuelve:
-    100 si detecta celular,
-    0 si no.
+    cls=1 → celular
     """
     res = yolo_phone(frame, verbose=False)[0]
 
@@ -171,6 +219,7 @@ def main():
     mp_h = MPHelpers()
     perclos = PERCLOS()
     blinks = BlinkRate()
+    belt_monitor = BeltMonitor()   # <--- agregado
 
     ui = UIManager(col1_x=16, col2_x=340)
     weights = FusionWeights(0.5, 0.25, 0.25)
@@ -179,7 +228,7 @@ def main():
 
     while True:
         ok, frame = cap.read()
-        if not ok: 
+        if not ok:
             break
 
         frame = cv.resize(frame, (CAM_WIDTH, CAM_HEIGHT))
@@ -223,9 +272,10 @@ def main():
             score_somn = min(score_somn, 100)
 
         # ----------------------------------------
-        # CINTURÓN — YOLO
+        # CINTURÓN — YOLO + monitoreo 60s/5s
         # ----------------------------------------
-        score_belt = detect_belt_yolo(frame)
+        belt_detected = (detect_belt_yolo(frame) == 0)
+        score_belt = belt_monitor.update(belt_detected, now)
 
         # ----------------------------------------
         # CELULAR — YOLO
