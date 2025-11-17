@@ -10,6 +10,8 @@ from time import time
 from collections import deque
 from dataclasses import dataclass
 import math
+import os
+from ultralytics import YOLO
 
 # --- UI ---
 from ui_manager_v3 import (
@@ -20,6 +22,17 @@ from ui_manager_v3 import (
     CAM_WIDTH,
     CAM_HEIGHT
 )
+
+# =======================================================
+# 0. CARGAR MODELOS YOLO (celular y cinturón)
+# =======================================================
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+CELULAR_MODEL_PATH = os.path.join(SCRIPT_DIR, "celular.pt")
+CINTURON_MODEL_PATH = os.path.join(SCRIPT_DIR, "cinturon.pt")
+
+yolo_phone = YOLO(CELULAR_MODEL_PATH)
+yolo_belt  = YOLO(CINTURON_MODEL_PATH)
+
 
 # =======================================================
 # 1. MEDIA PIPE HELPERS
@@ -40,15 +53,13 @@ class MPHelpers:
         pose = self.pose.process(rgb)
         return face, hands, pose
 
+
 # =======================================================
 # 2. SOMNOLENCIA: EAR / MAR / PERCLOS / BLINK RATE
 # =======================================================
 
-# Landmarks ojo izquierdo / derecho en Mediapipe
 LEFT_EYE = [33, 160, 158, 133, 153, 144]
 RIGHT_EYE = [362, 385, 387, 263, 373, 380]
-
-# Boca
 MOUTH = [13, 14, 78, 308]
 
 def euclidean(a, b):
@@ -68,7 +79,7 @@ def compute_MAR(landmarks, mouth_ids):
     C = euclidean(pts[mouth_ids[2]], pts[mouth_ids[3]])
     return A / C
 
-# --- PERCLOS ---
+
 class PERCLOS:
     def __init__(self, window_seconds=60):
         self.window = window_seconds
@@ -85,7 +96,7 @@ class PERCLOS:
         closed = sum(1 for _, c in self.data if c)
         return closed / len(self.data)
 
-# --- Blink Rate ---
+
 class BlinkRate:
     def __init__(self, window=15):
         self.window = window
@@ -95,53 +106,55 @@ class BlinkRate:
     def update(self, closed, t):
         if closed and not self.prev_closed:
             self.blinks.append(t)
-
         self.prev_closed = closed
-
         while self.blinks and self.blinks[0] < t - self.window:
             self.blinks.popleft()
 
     def value(self):
-        return len(self.blinks) / self.window  # blinks per second
+        return len(self.blinks) / self.window
+
 
 # =======================================================
-# 3. CINTURÓN (placeholder, tu modelo real va aquí)
+# 3. CINTURÓN — YOLO
 # =======================================================
 
-def detect_belt(frame, roi):
-    return 0.0  # 0 OK, 100 riesgo
+def detect_belt_yolo(frame, min_conf=0.5):
+    """
+    Devuelve:
+    0.0  si encuentra cinturón
+    100 si no encuentra
+    """
+    res = yolo_belt(frame, verbose=False)[0]
+
+    for b in res.boxes:
+        if float(b.conf[0]) >= min_conf:
+            return 0.0  # cinturón detectado
+
+    return 100.0  # no detectado → riesgo
+
 
 # =======================================================
-# 4. CELULAR (placeholder)
+# 4. CELULAR — YOLO
 # =======================================================
 
-class PhoneHeuristic:
-    def __init__(self, hold_seconds=2.0):
-        self.hold = hold_seconds
-        self.ts_start = None
-        self.active = False
+def detect_phone_yolo(frame, min_conf=0.5):
+    """
+    Tu modelo tiene cls=1 → celular
+    Devuelve:
+    100 si detecta celular,
+    0 si no.
+    """
+    res = yolo_phone(frame, verbose=False)[0]
 
-    def update(self, face_rect, hand_centroids, t):
-        self.active = False
-        score = 0
+    for b in res.boxes:
+        cls = int(b.cls[0])
+        conf = float(b.conf[0])
 
-        if face_rect and hand_centroids:
-            fx, fy, fw, fh = face_rect
-            face_cx = fx + fw / 2
-            face_cy = fy + fh / 2
+        if cls == 1 and conf >= min_conf:
+            return 100.0
 
-            for hx, hy in hand_centroids:
-                dist = math.hypot(hx - face_cx, hy - face_cy)
-                if dist < fw * 0.6:
-                    if self.ts_start is None:
-                        self.ts_start = t
-                    elif t - self.ts_start >= self.hold:
-                        self.active = True
-                        score = 100
-                else:
-                    self.ts_start = None
+    return 0.0
 
-        return self.active, score
 
 # =======================================================
 # 5. MAIN
@@ -158,7 +171,6 @@ def main():
     mp_h = MPHelpers()
     perclos = PERCLOS()
     blinks = BlinkRate()
-    phone = PhoneHeuristic()
 
     ui = UIManager(col1_x=16, col2_x=340)
     weights = FusionWeights(0.5, 0.25, 0.25)
@@ -167,8 +179,9 @@ def main():
 
     while True:
         ok, frame = cap.read()
-        if not ok: break
-        #Agregado porque me tiraba error
+        if not ok: 
+            break
+
         frame = cv.resize(frame, (CAM_WIDTH, CAM_HEIGHT))
 
         now = time()
@@ -202,7 +215,6 @@ def main():
             perclos.update(eyes_closed, now)
             blinks.update(eyes_closed, now)
 
-            # Score
             score_somn = (
                 perclos.value() * 60 +
                 (20 if yawn else 0) +
@@ -211,20 +223,19 @@ def main():
             score_somn = min(score_somn, 100)
 
         # ----------------------------------------
-        # CINTURÓN
+        # CINTURÓN — YOLO
         # ----------------------------------------
-        score_belt = 0
+        score_belt = detect_belt_yolo(frame)
 
         # ----------------------------------------
-        # CELULAR
+        # CELULAR — YOLO
         # ----------------------------------------
-        score_phone = 0
+        score_phone = detect_phone_yolo(frame)
 
         # ----------------------------------------
         # FUSIÓN
         score_global = fuse_scores(score_somn, score_belt, score_phone, weights)
 
-        # Estado
         if score_global > 50: state = 2
         elif score_global > 25: state = 1
         else: state = 0

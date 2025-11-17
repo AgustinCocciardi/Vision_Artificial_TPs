@@ -56,7 +56,7 @@ while True:
         x1, y1, x2, y2 = map(int, box.xyxy[0])
 
         # El modelo tiene solo una clase 'phone' cls==0
-        if cls == 0 and conf > 0.6:  # cls==0 → cinturón
+        if cls == 0 and conf > 0.5:  # cls==0 → cinturón
             cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
             cv2.putText(frame, f"Seatbelt {conf:.2f}", (x1, y1 - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
