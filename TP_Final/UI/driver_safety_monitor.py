@@ -51,39 +51,28 @@ MISSING_DURATION = 5
 
 class BeltMonitor:
     def __init__(self, grace_after_detect=GRACE_AFTER_DETECT, require_missing_duration=MISSING_DURATION):
-        self.grace_after_detect = grace_after_detect        # después de verlo
-        self.require_missing_duration = require_missing_duration  # 5s sin verlo → alerta
+        self.grace_after_detect = grace_after_detect
+        self.require_missing_duration = require_missing_duration
 
         self.last_belt_ok_time = None
         self.first_missing_time = None
 
     def update(self, belt_detected: bool, ts: float):
-        """
-        Devuelve:
-            0   -> cinturón OK
-            100 -> alerta (ausente tras estar un tiempo sin detectarlo)
-        """
-
-        # Caso 1: detectado → OK + reiniciar timers
         if belt_detected:
             self.last_belt_ok_time = ts
             self.first_missing_time = None
             return 0
 
-        # Caso 2: nunca detectado → chequear unos segundos
         if self.last_belt_ok_time is None:
             return self._handle_missing(ts)
 
-        # Caso 3: dentro de ventana de gracia
         if (ts - self.last_belt_ok_time) < self.grace_after_detect:
             self.first_missing_time = None
             return 0
 
-        # Caso 4: pasó el minuto → aplicar regla de segundos
         return self._handle_missing(ts)
 
     def _handle_missing(self, ts: float):
-        """Lógica de segundos para disparar alerta."""
         if self.first_missing_time is None:
             self.first_missing_time = ts
             return 0
@@ -175,6 +164,31 @@ class BlinkRate:
 
 
 # =======================================================
+# *** AGREGADO *** MANO TAPANDO CARA
+# =======================================================
+
+def hand_covers_face(face_landmarks, hands_results, frame_w, frame_h):
+    if hands_results is None or not hands_results.multi_hand_landmarks:
+        return False
+
+    pts = np.array([[lm.x * frame_w, lm.y * frame_h] for lm in face_landmarks])
+
+    eye_mouth_y1 = int(min(pts[160][1], pts[13][1]))  # ojos
+    eye_mouth_y2 = int(max(pts[160][1], pts[14][1]))  # boca
+    eye_mouth_x1 = int(min(pts[33][0], pts[263][0]))
+    eye_mouth_x2 = int(max(pts[33][0], pts[263][0]))
+
+    for hand in hands_results.multi_hand_landmarks:
+        for lm in hand.landmark:
+            x = lm.x * frame_w
+            y = lm.y * frame_h
+            if eye_mouth_x1 <= x <= eye_mouth_x2 and eye_mouth_y1 <= y <= eye_mouth_y2:
+                return True
+
+    return False
+
+
+# =======================================================
 # 3. CINTURÓN — YOLO
 # =======================================================
 
@@ -228,7 +242,7 @@ def main():
     mp_h = MPHelpers()
     perclos = PERCLOS()
     blinks = BlinkRate()
-    belt_monitor = BeltMonitor()   # <--- agregado
+    belt_monitor = BeltMonitor()
 
     ui = UIManager(col1_x=16, col2_x=340)
     weights = FusionWeights(0.5, 0.25, 0.25)
@@ -280,6 +294,11 @@ def main():
             )
             score_somn = min(score_somn, 100)
 
+            # *** AGREGADO: mano tapa ojos o boca ***
+            hand_on_face = hand_covers_face(lm, hands, CAM_WIDTH, CAM_HEIGHT)
+            if hand_on_face:
+                score_somn = max(score_somn, 50)
+
         # ----------------------------------------
         # CINTURÓN — YOLO + monitoreo grace/5s
         # ----------------------------------------
@@ -313,6 +332,11 @@ def main():
         ui.put_kv_col2(canvas, f"EAR: {EAR:.3f} MAR: {MAR:.3f}")
         ui.put_kv_col2(canvas, f"PERCLOS: {perclos.value():.2f}")
         ui.put_kv_col2(canvas, f"Blink rate: {blinks.value():.2f}/s")
+
+        # Alerta visual temporal por mano en la cara
+        if hand_on_face:
+            cv.putText(canvas, "Retire su mano de la cara", (12, 60),
+                    cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
         ui.draw_alerts(canvas, state)
 
