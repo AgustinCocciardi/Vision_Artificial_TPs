@@ -35,13 +35,22 @@ yolo_belt  = YOLO(CINTURON_MODEL_PATH)
 
 
 # =======================================================
-# 0.1. LÓGICA DEL CINTURÓN (60s grace + 5s ausencia)
+# 0.1. LÓGICA DEL CINTURÓN (grace + 5s ausencia)
 # =======================================================
 
+# Periodo de gracia
+# Una vez detectado el cinturón, no volvemos a preguntar hasta después de X segundos.
+# Esto es porque en la vida real, nadie maneja quitándose y poniéndose el cinturón a cada momento.
 GRACE_AFTER_DETECT = 20
+# Tiempo de nueva detección
+# Una vez que detectamos el cinturón, pasamos unos segundos sin volver a preguntar si lo tiene puesto.
+# Pasado ese tiempo, evaluamos durante una cantidad pequeña de segundos. 
+# Para detectar que falta el cinturón, debe estar 5 segundos completos sin detectarlo.
+MISSING_DURATION = 5
+# Cuando se detecta el cinturón, los contadores se reinician. 
 
 class BeltMonitor:
-    def __init__(self, grace_after_detect=GRACE_AFTER_DETECT, require_missing_duration=5.0):
+    def __init__(self, grace_after_detect=GRACE_AFTER_DETECT, require_missing_duration=MISSING_DURATION):
         self.grace_after_detect = grace_after_detect        # después de verlo
         self.require_missing_duration = require_missing_duration  # 5s sin verlo → alerta
 
@@ -52,7 +61,7 @@ class BeltMonitor:
         """
         Devuelve:
             0   -> cinturón OK
-            100 -> alerta (ausente 5s tras 1 minuto sin detectarlo)
+            100 -> alerta (ausente tras estar un tiempo sin detectarlo)
         """
 
         # Caso 1: detectado → OK + reiniciar timers
@@ -61,7 +70,7 @@ class BeltMonitor:
             self.first_missing_time = None
             return 0
 
-        # Caso 2: nunca detectado → chequear 5 segundos
+        # Caso 2: nunca detectado → chequear unos segundos
         if self.last_belt_ok_time is None:
             return self._handle_missing(ts)
 
@@ -70,11 +79,11 @@ class BeltMonitor:
             self.first_missing_time = None
             return 0
 
-        # Caso 4: pasó el minuto → aplicar regla de 5 segundos
+        # Caso 4: pasó el minuto → aplicar regla de segundos
         return self._handle_missing(ts)
 
     def _handle_missing(self, ts: float):
-        """Lógica de 5 segundos para disparar alerta."""
+        """Lógica de segundos para disparar alerta."""
         if self.first_missing_time is None:
             self.first_missing_time = ts
             return 0
@@ -272,7 +281,7 @@ def main():
             score_somn = min(score_somn, 100)
 
         # ----------------------------------------
-        # CINTURÓN — YOLO + monitoreo 60s/5s
+        # CINTURÓN — YOLO + monitoreo grace/5s
         # ----------------------------------------
         belt_detected = (detect_belt_yolo(frame) == 0)
         score_belt = belt_monitor.update(belt_detected, now)
