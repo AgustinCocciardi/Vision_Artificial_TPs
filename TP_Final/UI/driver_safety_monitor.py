@@ -285,10 +285,15 @@ def main():
             yawn = MAR > 0.7
 
             perclos.update(eyes_closed, now)
+            # ⭐ Nueva escala de PERCLOS
+            raw_perclos = perclos.value()
+            #perclos_scaled = 100 / (1 + np.exp(-20*(raw_perclos - 0.15)))
+            perclos_scaled = raw_perclos * 120
+            
             blinks.update(eyes_closed, now)
 
             score_somn = (
-                perclos.value() * 60 +
+                perclos_scaled +
                 (20 if yawn else 0) +
                 (20 if blinks.value() > 0.35 else 0)
             )
