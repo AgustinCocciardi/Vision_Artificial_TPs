@@ -302,7 +302,7 @@ def main():
             # *** AGREGADO: mano tapa ojos o boca ***
             hand_on_face = hand_covers_face(lm, hands, CAM_WIDTH, CAM_HEIGHT)
             if hand_on_face:
-                score_somn = max(score_somn, 50)
+                score_somn = max(score_somn, 100)
 
         # ----------------------------------------
         # CINTURÓN — YOLO + monitoreo grace/5s
