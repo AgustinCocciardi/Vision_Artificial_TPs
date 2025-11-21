@@ -82,6 +82,29 @@ class BeltMonitor:
 
         return 0
 
+# =======================================================
+# 0.2. MONITOR DE ROSTRO — alerta si no hay rostro 5s
+# =======================================================
+
+class FaceMonitor:
+    def __init__(self, missing_duration=5):
+        self.missing_duration = missing_duration
+        self.first_missing_time = None
+
+    def update(self, face_detected: bool, ts: float):
+        if face_detected:
+            self.first_missing_time = None
+            return 0  # sin alerta
+
+        # si no se detecta rostro...
+        if self.first_missing_time is None:
+            self.first_missing_time = ts
+            return 0
+
+        if (ts - self.first_missing_time) >= self.missing_duration:
+            return 100  # ALERTA
+
+        return 0
 
 # =======================================================
 # 1. MEDIA PIPE HELPERS
@@ -243,6 +266,7 @@ def main():
     perclos = PERCLOS()
     blinks = BlinkRate()
     belt_monitor = BeltMonitor()
+    face_monitor = FaceMonitor(missing_duration=0.5)
 
     ui = UIManager(col1_x=16, col2_x=340)
     weights = FusionWeights(0.5, 0.25, 0.25)
@@ -263,6 +287,7 @@ def main():
         canvas = ui.create_canvas(frame)
 
         face, hands, pose = mp_h.process(frame)
+        face_detected = bool(face.multi_face_landmarks)
 
         EAR, MAR = 0, 0
         eyes_closed = False
@@ -314,6 +339,11 @@ def main():
         # CELULAR — YOLO
         # ----------------------------------------
         score_phone = detect_phone_yolo(frame)
+        
+        # ----------------------------------------
+        # ROSTRO NO DETECTADO
+        # ----------------------------------------
+        score_face = face_monitor.update(face_detected, now)
 
         # ----------------------------------------
         # FUSIÓN
@@ -342,6 +372,11 @@ def main():
         if hand_on_face:
             cv.putText(canvas, "Retire su mano de la cara", (12, 60),
                     cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            
+        # Alerta por si no se detecta rostro
+        if score_face == 100:
+            cv.putText(canvas, "PELIGRO: No se detecta rostro", (12, 90),
+                    cv.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255), 2)
 
         ui.draw_alerts(canvas, state)
 
