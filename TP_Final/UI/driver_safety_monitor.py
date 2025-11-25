@@ -64,7 +64,8 @@ class BeltMonitor:
             return 0
 
         if self.last_belt_ok_time is None:
-            return self._handle_missing(ts)
+            #return self._handle_missing(ts)
+            return 100
 
         if (ts - self.last_belt_ok_time) < self.grace_after_detect:
             self.first_missing_time = None
@@ -273,6 +274,7 @@ def main():
 
     last_t = time()
 
+    hand_on_face = False
     while True:
         ok, frame = cap.read()
         if not ok:
