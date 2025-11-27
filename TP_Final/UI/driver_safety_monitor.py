@@ -235,7 +235,9 @@ def detect_belt_yolo(frame, min_conf=0.5):
 # 4. CELULAR — YOLO
 # =======================================================
 
-def detect_phone_yolo(frame, min_conf=0.5):
+MINIMUM_CONFIDENCE = 0.71
+
+def detect_phone_yolo(frame, min_conf=MINIMUM_CONFIDENCE):
     """
     cls=1 → celular
     """
