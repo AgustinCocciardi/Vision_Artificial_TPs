@@ -138,9 +138,19 @@ class UIManager:
             elif value_0_100 > 10: col = (0, 200, 255); label_text = "Cinturon: REVISAR"
             else: col = (60, 200, 60); label_text = "Cinturon: OK"
         else:
-            if value_0_100 > 50: col = (0, 0, 255)
-            elif value_0_100 > 25: col = (0, 200, 255)
-            label_text = f"{label}: {value_0_100:.0f}"
+            # --- Caso especial para el detector de celular ---
+            if label == "Celular":
+                if value_0_100 >= 50:
+                    col = (0, 0, 255)
+                    label_text = "Celular: DETECTADO"
+                else:
+                    col = (60, 200, 60)
+                    label_text = "Celular: No Detectado"
+            else:
+                # --- Comportamiento normal para otras barras ---
+                if value_0_100 > 50: col = (0, 0, 255)
+                elif value_0_100 > 25: col = (0, 200, 255)
+                label_text = f"{label}: {value_0_100:.0f}"
         cv.rectangle(img, (x, y), (x + w, y + h), (60, 60, 60), 1)
         ww = int(w * max(0.0, min(1.0, value_0_100 / 100.0)))
         cv.rectangle(img, (x + 1, y + 1), (x + ww - 1, y + h - 1), col, -1)
